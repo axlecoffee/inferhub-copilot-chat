@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { MUSE_VENDOR, type ProviderVendor } from "./providerTypes";
+import { INFERHUB_VENDOR, type ProviderVendor } from "./providerTypes";
 
 export interface BaseModelLimits {
   contextWindow: number;
@@ -75,8 +75,8 @@ export interface ModelsDevResponse {
 }
 
 export const MODELS_DEV_API_URL = "https://models.dev/api.json";
-export const MODEL_METADATA_REVISION = "session-2026-08-06-muse";
-export const MODEL_METADATA_CACHE_KEY = "meta-muse.modelMetadataCache.v1";
+export const MODEL_METADATA_REVISION = "session-2026-09-11-inferhub";
+export const MODEL_METADATA_CACHE_KEY = "inferhub.modelMetadataCache.v1";
 export const MODEL_METADATA_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 
 const DEFAULT_MODEL_LIMITS: BaseModelLimits = {
@@ -85,11 +85,11 @@ const DEFAULT_MODEL_LIMITS: BaseModelLimits = {
 };
 
 const MODELS_DEV_PROVIDER_BY_VENDOR: Record<ProviderVendor, keyof ModelsDevResponse> = {
-  [MUSE_VENDOR]: "meta",
+  [INFERHUB_VENDOR]: "meta",
 };
 
 const MODEL_LIMITS_BY_PROVIDER: Record<ProviderVendor, Record<string, BaseModelLimits>> = {
-  [MUSE_VENDOR]: {
+  [INFERHUB_VENDOR]: {
     "muse-spark-1.1": { contextWindow: 1048576, maxOutputTokens: 1048576 },
     "muse-spark-1.2": { contextWindow: 1048576, maxOutputTokens: 1048576 },
     "muse-spark-1.2-contributor": { contextWindow: 1048576, maxOutputTokens: 1048576 },
@@ -127,7 +127,7 @@ export function bundledModelMetadataSnapshot(): CachedModelMetadataSnapshot {
   return {
     fetchedAt: 0,
     providers: {
-      [MUSE_VENDOR]: bundledModelMetadataForProvider(MUSE_VENDOR),
+      [INFERHUB_VENDOR]: bundledModelMetadataForProvider(INFERHUB_VENDOR),
     },
   };
 }
@@ -159,8 +159,8 @@ export function normalizeModelsDevSnapshot(
   return {
     fetchedAt: Date.now(),
     providers: {
-      [MUSE_VENDOR]: normalizeModelsDevProvider(
-        data[MODELS_DEV_PROVIDER_BY_VENDOR[MUSE_VENDOR]]?.models ?? {},
+      [INFERHUB_VENDOR]: normalizeModelsDevProvider(
+        data[MODELS_DEV_PROVIDER_BY_VENDOR[INFERHUB_VENDOR]]?.models ?? {},
       ),
     },
   };

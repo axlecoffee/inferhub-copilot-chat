@@ -48,7 +48,7 @@ const queuedProgressLocalRequestIdSet = new Set<string>();
 
 function isContextIndicatorEnabled(): boolean {
   return vscode.workspace
-    .getConfiguration("meta-muse")
+    .getConfiguration("inferhub")
     .get("experimentalContextIndicator", false);
 }
 
@@ -162,7 +162,7 @@ async function captureProxy(
   logDiagnostic?: (message: string) => void,
 ): Promise<CapturedProxy | null> {
   const originalMapSet = Map.prototype.set;
-  const probeId = `_muse_probe_${Date.now()}`;
+  const probeId = `_inferhub_probe_${Date.now()}`;
   let found = false;
   let capturedProxyTarget: Record<string, unknown> | null = null;
   let capturedHandleProgressChunk: HandleProgressChunkFn | null = null;

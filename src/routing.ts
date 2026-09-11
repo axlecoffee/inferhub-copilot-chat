@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import {
-  MUSE_VENDOR,
+  INFERHUB_VENDOR,
   type ProviderRoutingDefinition,
 } from "./providerTypes";
 

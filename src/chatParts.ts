@@ -9,7 +9,7 @@ import {
   type UsageSnapshot,
 } from "./usage";
 
-export const MUSE_USAGE_DATA_MIME = "application/vnd.muse.usage+json";
+export const INFERHUB_USAGE_DATA_MIME = "application/vnd.inferhub.usage+json";
 export const COPILOT_USAGE_DATA_MIME = "usage";
 
 export function createUsageDataPart(
@@ -33,13 +33,13 @@ export function createUsageDataParts(
   const data = new TextEncoder().encode(JSON.stringify(payload));
   return [
     new vscode.LanguageModelDataPart(data, COPILOT_USAGE_DATA_MIME),
-    new vscode.LanguageModelDataPart(data, MUSE_USAGE_DATA_MIME),
+    new vscode.LanguageModelDataPart(data, INFERHUB_USAGE_DATA_MIME),
   ];
 }
 
 export function isInternalDataPart(
   part: vscode.LanguageModelDataPart,
 ): boolean {
-  return part.mimeType === MUSE_USAGE_DATA_MIME
+  return part.mimeType === INFERHUB_USAGE_DATA_MIME
     || part.mimeType === COPILOT_USAGE_DATA_MIME;
 }

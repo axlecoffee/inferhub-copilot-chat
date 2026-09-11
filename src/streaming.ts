@@ -4,10 +4,10 @@
 
 import * as vscode from "vscode";
 import {
-  buildMuseRequestError,
+  buildInferhubRequestError,
   formatDuration,
   formatRateLimitSummary,
-  MuseRequestError,
+  InferHubRequestError,
   readRateLimitInfo,
   truncateForLog,
 } from "./errors";
@@ -72,7 +72,7 @@ export async function streamChatCompletions(
     createReasoningDebugger(options.output, options.debugReasoning),
   );
 
-  await streamMuseResponse({
+  await streamInferhubResponse({
     ...options,
     extractStreamParts: (data) => extractor.extractStreamParts(data),
     extractFullParts: (data) => extractor.extractFullParts(data),
@@ -80,7 +80,7 @@ export async function streamChatCompletions(
 
   extractor.flushReasoningFallback(
     options.progress,
-    options.requestHeaders["x-muse-request"],
+    options.requestHeaders["x-inferhub-request"],
   );
   if (options.debugTransport) {
     options.output?.appendLine(
@@ -97,7 +97,7 @@ export async function streamChatCompletions(
 
 export const streamResponses = streamChatCompletions;
 
-interface StreamMuseResponseOptions extends StreamRequestOptions {
+interface StreamInferhubResponseOptions extends StreamRequestOptions {
   extractStreamParts: (data: unknown) => vscode.LanguageModelResponsePart[];
   extractFullParts: (data: unknown) => vscode.LanguageModelResponsePart[];
   maxRetries?: number;
@@ -132,8 +132,8 @@ const CONNECTION_TIMEOUT_MS = 60_000;
 const FIRST_EVENT_TIMEOUT_MS = 90_000;
 const MAX_RETRIES = 2;
 
-async function streamMuseResponse(
-  options: StreamMuseResponseOptions,
+async function streamInferhubResponse(
+  options: StreamInferhubResponseOptions,
 ): Promise<void> {
   const maxAttempts = (options.maxRetries ?? MAX_RETRIES) + 1;
   let lastError: unknown;
@@ -146,7 +146,7 @@ async function streamMuseResponse(
     }
 
     try {
-      await streamMuseResponseAttempt({ ...options, body }, attempt);
+      await streamInferhubResponseAttempt({ ...options, body }, attempt);
       return;
     } catch (error) {
       lastError = error;
@@ -260,13 +260,13 @@ function pruneRequestBody(body: unknown): unknown {
   return changed ? obj : body;
 }
 
-async function streamMuseResponseAttempt(
-  options: StreamMuseResponseOptions,
+async function streamInferhubResponseAttempt(
+  options: StreamInferhubResponseOptions,
   attempt: number,
 ): Promise<void> {
   const controller = new AbortController();
   const startedAt = Date.now();
-  const localRequestId = options.requestHeaders["x-muse-request"];
+  const localRequestId = options.requestHeaders["x-inferhub-request"];
   let firstByteAt: number | undefined;
   const usageSummary: RequestUsageSummary = {};
   let abortReason:
@@ -324,8 +324,8 @@ async function streamMuseResponseAttempt(
       providerDisplayName: options.providerDisplayName,
       modelId: options.modelId,
       url: options.url,
-      requestId: options.requestHeaders["x-muse-request"],
-      sessionId: options.requestHeaders["x-muse-session"],
+      requestId: options.requestHeaders["x-inferhub-request"],
+      sessionId: options.requestHeaders["x-inferhub-session"],
       status: responseStatus,
       contentType: responseContentType,
       payloadBytes:
@@ -448,7 +448,7 @@ async function streamMuseResponseAttempt(
           `[http-error-body] ${detail.trim() ? truncateForLog(detail) : "<empty>"}`,
         );
       }
-      const requestError = buildMuseRequestError(
+      const requestError = buildInferhubRequestError(
         options.providerDisplayName,
         response,
         detail,
@@ -569,7 +569,7 @@ async function streamMuseResponseAttempt(
     if (abortReason === "request-timeout") {
       const elapsed = Date.now() - startedAt;
       const phase = firstByteAt === undefined ? "connection" : "streaming";
-      const requestError = new MuseRequestError(
+      const requestError = new InferHubRequestError(
         `${options.providerDisplayName} request timed out after ${formatDuration(elapsed)} (during ${phase} phase).`,
         firstByteAt === undefined
           ? `${options.providerDisplayName} did not respond within ${formatDuration(CONNECTION_TIMEOUT_MS)}. The server may be temporarily unavailable. Try again in a moment or switch to a different model.`
@@ -582,7 +582,7 @@ async function streamMuseResponseAttempt(
       throw requestError;
     }
     if (abortReason === "stream-idle-timeout") {
-      const requestError = new MuseRequestError(
+      const requestError = new InferHubRequestError(
         `${options.providerDisplayName} stream stalled for ${formatDuration(options.streamIdleTimeoutMs)} without new data.`,
         `${options.providerDisplayName} stopped sending stream data for ${formatDuration(options.streamIdleTimeoutMs)}, so the request was cancelled.`,
       );
@@ -778,7 +778,7 @@ class ResponsesExtractor {
           if (callId) pending.callId = callId;
           if (pending.name) {
             const toolPart = new vscode.LanguageModelToolCallPart(
-              pending.callId || pending.id || `muse-tool-${Date.now()}`,
+              pending.callId || pending.id || `inferhub-tool-${Date.now()}`,
               pending.name,
               parseToolInput(pending.arguments),
             );
@@ -793,7 +793,7 @@ class ResponsesExtractor {
           }
         } else if (name) {
           const toolPart = new vscode.LanguageModelToolCallPart(
-            callId || id || `muse-tool-${Date.now()}`,
+            callId || id || `inferhub-tool-${Date.now()}`,
             name,
             parseToolInput(args),
           );
@@ -842,7 +842,7 @@ class ResponsesExtractor {
           }
         }
       } else if (item.type === "function_call") {
-        const id = typeof item.call_id === "string" ? item.call_id : typeof item.id === "string" ? item.id : `muse-tool-${Date.now()}`;
+        const id = typeof item.call_id === "string" ? item.call_id : typeof item.id === "string" ? item.id : `inferhub-tool-${Date.now()}`;
         const name = typeof item.name === "string" ? item.name : "";
         const args = typeof item.arguments === "string" ? item.arguments : "{}";
         if (name) {
@@ -994,7 +994,7 @@ function toolCallPartsFromOpenAiMessage(
       const id =
         typeof toolCall.id === "string"
           ? toolCall.id
-          : `muse-tool-${Date.now()}-${index}`;
+          : `inferhub-tool-${Date.now()}-${index}`;
       const name = isRecord(fn) && typeof fn.name === "string" ? fn.name : "";
       const args =
         isRecord(fn) && typeof fn.arguments === "string" ? fn.arguments : "{}";

@@ -18,24 +18,24 @@ interface RateLimitInfo {
   tokenRemaining?: string;
 }
 
-export class MuseRequestError extends Error {
+export class InferHubRequestError extends Error {
   constructor(
     message: string,
     readonly userMessage: string = message,
   ) {
     super(message);
-    this.name = "MuseRequestError";
+    this.name = "InferHubRequestError";
   }
 }
 
-export function buildMuseRequestError(
+export function buildInferhubRequestError(
   providerDisplayName: string,
   response: Response,
   rawDetail: string,
   modelId: string | undefined,
   payloadBytes: number,
   capacityHint: string,
-): MuseRequestError {
+): InferHubRequestError {
   const apiError = parseApiError(rawDetail);
   const rateLimitInfo = readRateLimitInfo(response.headers);
   const modelHint = modelId ? ` model=${modelId}` : "";
@@ -58,14 +58,14 @@ export function buildMuseRequestError(
     const userMessage = `${providerDisplayName}: ${reason}${
       modelHint ? ` (${modelId})` : ""
     }. ${details.join(" ")}`.trim();
-    return new MuseRequestError(
+    return new InferHubRequestError(
       `${providerDisplayName} API rate/quota limit (${response.status})${modelHint}${sizeHint}: ${apiMessage}; ${quotaText || "no quota headers"}`,
       userMessage,
     );
   }
 
   const userMessage = `${providerDisplayName} API request failed (HTTP ${response.status})${modelHint ? ` for ${modelId}` : ""}: ${apiMessage}${capacityHint}`;
-  return new MuseRequestError(
+  return new InferHubRequestError(
     `${providerDisplayName} API request failed (${response.status})${modelHint}${sizeHint}${capacityHint}: ${apiMessage}`,
     userMessage,
   );

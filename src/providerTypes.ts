@@ -2,9 +2,9 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-export const MUSE_VENDOR = "meta-muse" as const;
+export const INFERHUB_VENDOR = "inferhub" as const;
 
-export type ProviderVendor = typeof MUSE_VENDOR;
+export type ProviderVendor = typeof INFERHUB_VENDOR;
 
 export interface ProviderRoutingDefinition {
   vendor: ProviderVendor;

@@ -4,7 +4,7 @@
 
 import * as vscode from "vscode";
 import {
-  MuseRequestError,
+  InferHubRequestError,
 } from "./errors";
 import {
   MODEL_METADATA_CACHE_KEY,
@@ -23,7 +23,7 @@ import {
 import {
   resolveModelRouting,
 } from "./routing";
-import { buildMuseAuthHeaders } from "./museAuth";
+import { buildInferhubAuthHeaders } from "./inferhubAuth";
 import {
   fetchUsageLogPage,
   formatUsageReport,
@@ -33,7 +33,7 @@ import {
   streamResponses as runStreamResponses,
   type TransportRequestSummary,
 } from "./streaming";
-import { MUSE_VENDOR } from "./providerTypes";
+import { INFERHUB_VENDOR } from "./providerTypes";
 import { isInternalDataPart } from "./chatParts";
 import {
   disposeContextWindowHookBridge,
@@ -46,14 +46,14 @@ import {
   type UsageSnapshot,
 } from "./usage";
 
-const SECRET_KEY = "meta-muse.apiKey";
+const SECRET_KEY = "inferhub.apiKey";
 const RECENT_TRANSPORT_SUMMARY_LIMIT = 25;
-const RECENT_TRANSPORT_SUMMARY_STORAGE_PREFIX = "meta-muse.recentTransportSummaries";
+const RECENT_TRANSPORT_SUMMARY_STORAGE_PREFIX = "inferhub.recentTransportSummaries";
 
 let usageStatusBarItem: vscode.StatusBarItem | undefined;
 
 interface ProviderDefinition {
-  vendor: typeof MUSE_VENDOR;
+  vendor: typeof INFERHUB_VENDOR;
   displayName: string;
   modelNamePrefix: string;
   modelsUrl: string;
@@ -75,26 +75,26 @@ type ModelEndpointKind =
 const KNOWN_UNAVAILABLE_MODEL_IDS = new Set<string>([]);
 const DEFAULT_REQUEST_TIMEOUT_MS = 2 * 60 * 1000;
 const DEFAULT_STREAM_IDLE_TIMEOUT_MS = 90 * 1000;
-const MUSE_CLIENT = "vscode-copilot-chat";
-const MUSE_USER_AGENT = "meta-muse-copilot-chat/0.2.0 VSCode";
+const INFERHUB_CLIENT = "vscode-copilot-chat";
+const INFERHUB_USER_AGENT = "inferhub-copilot-chat/0.3.0 VSCode";
 
-const MUSE_BASE_URL_DEFAULT = "https://api.inferhub.dev/v1";
+const INFERHUB_BASE_URL_DEFAULT = "https://api.inferhub.dev/v1";
 
-function getMuseBaseUrl(): string {
-  const override = vscode.workspace.getConfiguration("meta-muse").get<string>("baseUrl", "");
-  return override.trim() || MUSE_BASE_URL_DEFAULT;
+function getInferhubBaseUrl(): string {
+  const override = vscode.workspace.getConfiguration("inferhub").get<string>("baseUrl", "");
+  return override.trim() || INFERHUB_BASE_URL_DEFAULT;
 }
 
-function isSupportedMuseChatModel(modelId: string): boolean {
+function isSupportedInferhubModel(modelId: string): boolean {
   return /muse-spark/i.test(modelId);
 }
 
 function buildProviderDefinition(): ProviderDefinition {
-  const baseUrl = getMuseBaseUrl();
+  const baseUrl = getInferhubBaseUrl();
   return {
-    vendor: MUSE_VENDOR,
-    displayName: "Muse (InferHub)",
-    modelNamePrefix: "Muse",
+    vendor: INFERHUB_VENDOR,
+    displayName: "InferHub",
+    modelNamePrefix: "InferHub",
     modelsUrl: `${baseUrl}/models`,
     chatCompletionsUrl: `${baseUrl}/chat/completions`,
     messagesUrl: `${baseUrl}/chat/completions`,
@@ -107,17 +107,17 @@ function buildProviderDefinition(): ProviderDefinition {
       "cmc/meta/muse-spark-1.3-contributor",
       "cmc/meta/muse-spark-1.3",
     ],
-    filterModel: isSupportedMuseChatModel,
+    filterModel: isSupportedInferhubModel,
   };
 }
 
 const PROVIDERS: Record<ProviderDefinition["vendor"], ProviderDefinition> = {
-  [MUSE_VENDOR]: buildProviderDefinition(),
+  [INFERHUB_VENDOR]: buildProviderDefinition(),
 };
 
 type ResponsesRole = "user" | "assistant" | "developer" | "system";
 
-interface MuseModel extends vscode.LanguageModelChatInformation {
+interface InferhubModel extends vscode.LanguageModelChatInformation {
   endpointKind: ModelEndpointKind;
   provider: ProviderDefinition;
   rawModelId?: string;
@@ -190,7 +190,7 @@ interface PendingToolCall {
   arguments: string;
 }
 
-type MuseReasoningEffort = "auto" | "minimal" | "low" | "medium" | "high" | "xhigh";
+type InferhubReasoningEffort = "auto" | "minimal" | "low" | "medium" | "high" | "xhigh";
 
 interface ApiSettings {
   temperature: number;
@@ -200,7 +200,7 @@ interface ApiSettings {
   debugLogging: boolean;
   requestTimeoutMs: number;
   streamIdleTimeoutMs: number;
-  thinkingEffort: MuseReasoningEffort;
+  thinkingEffort: InferhubReasoningEffort;
 }
 
 interface LanguageModelConfiguration {
@@ -293,23 +293,23 @@ interface RecentTransportSummary extends TransportRequestSummary {
 export function activate(context: vscode.ExtensionContext) {
   ensureUsageStatusBar(context);
   void syncExperimentalContextIndicator();
-  const museProvider = new MuseProvider(context, PROVIDERS[MUSE_VENDOR]);
+  const inferhubProvider = new InferhubProvider(context, PROVIDERS[INFERHUB_VENDOR]);
 
   context.subscriptions.push(
-    vscode.lm.registerLanguageModelChatProvider(MUSE_VENDOR, museProvider),
-    vscode.commands.registerCommand("meta-muse.manage", () => museProvider.manage()),
-    vscode.commands.registerCommand("meta-muse.diagnostics", () => museProvider.showDiagnostics()),
-    vscode.commands.registerCommand("meta-muse.setApiKey", () => museProvider.setApiKey()),
-    vscode.commands.registerCommand("meta-muse.usage", () => museProvider.showUsage()),
-    vscode.commands.registerCommand("meta-muse.modelPickerDiagnostics", () => showModelPickerDiagnostics()),
+    vscode.lm.registerLanguageModelChatProvider(INFERHUB_VENDOR, inferhubProvider),
+    vscode.commands.registerCommand("inferhub.manage", () => inferhubProvider.manage()),
+    vscode.commands.registerCommand("inferhub.diagnostics", () => inferhubProvider.showDiagnostics()),
+    vscode.commands.registerCommand("inferhub.setApiKey", () => inferhubProvider.setApiKey()),
+    vscode.commands.registerCommand("inferhub.usage", () => inferhubProvider.showUsage()),
+    vscode.commands.registerCommand("inferhub.modelPickerDiagnostics", () => showModelPickerDiagnostics()),
   );
 
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((event) => {
-      if (event.affectsConfiguration("meta-muse.showUsageStatusBar")) {
+      if (event.affectsConfiguration("inferhub.showUsageStatusBar")) {
         resetUsageStatusBar();
       }
-      if (event.affectsConfiguration("meta-muse.experimentalContextIndicator")) {
+      if (event.affectsConfiguration("inferhub.experimentalContextIndicator")) {
         void syncExperimentalContextIndicator();
       }
     }),
@@ -352,24 +352,24 @@ function checkUtilityModelConfiguration(context: vscode.ExtensionContext): void 
   void chat
     .update("byokUtilityModelDefault", "mainAgent", vscode.ConfigurationTarget.Global)
     .then(() => {
-      const NOTICE_KEY = "meta-muse.utilityModelAutoFixed.v1128";
+      const NOTICE_KEY = "inferhub.utilityModelAutoFixed.v1128";
       if (context.globalState.get<boolean>(NOTICE_KEY)) return;
       void context.globalState.update(NOTICE_KEY, true);
       void vscode.window.showInformationMessage(
-        "Muse Copilot Chat: Automatically fixed VS Code 1.128 utility model setting. " +
-          "Background tasks (chat titles, commit messages) now use your Muse model.",
+        "InferHub Copilot Chat: Automatically fixed VS Code 1.128 utility model setting. " +
+          "Background tasks (chat titles, commit messages) now use your InferHub model.",
       );
     });
 }
 
 async function warmModelPickerMetadata(): Promise<void> {
   await Promise.allSettled([
-    vscode.lm.selectChatModels({ vendor: MUSE_VENDOR }),
+    vscode.lm.selectChatModels({ vendor: INFERHUB_VENDOR }),
   ]);
 }
 
 async function showModelPickerDiagnostics(): Promise<void> {
-  const vendors = [MUSE_VENDOR, "copilot"];
+  const vendors = [INFERHUB_VENDOR, "copilot"];
   const sections: string[] = [];
 
   for (const vendor of vendors) {
@@ -396,7 +396,7 @@ async function showModelPickerDiagnostics(): Promise<void> {
   }
 
   const doc = await vscode.workspace.openTextDocument({
-    content: ["# Muse Model Picker Diagnostics", "", ...sections].join("\n"),
+    content: ["# InferHub Model Picker Diagnostics", "", ...sections].join("\n"),
     language: "markdown"
   });
   await vscode.window.showTextDocument(doc, vscode.ViewColumn.Beside);
@@ -423,13 +423,13 @@ function ensureUsageStatusBar(
 
 function shouldShowUsageStatusBar(): boolean {
   return vscode.workspace
-    .getConfiguration("meta-muse")
+    .getConfiguration("inferhub")
     .get("showUsageStatusBar", true);
 }
 
 function isExperimentalContextIndicatorEnabled(): boolean {
   return vscode.workspace
-    .getConfiguration("meta-muse")
+    .getConfiguration("inferhub")
     .get("experimentalContextIndicator", false);
 }
 
@@ -437,7 +437,7 @@ let hookDiagnosticChannel: vscode.OutputChannel | undefined;
 
 function getHookDiagnosticChannel(): vscode.OutputChannel {
   if (!hookDiagnosticChannel) {
-    hookDiagnosticChannel = vscode.window.createOutputChannel("Muse");
+    hookDiagnosticChannel = vscode.window.createOutputChannel("InferHub");
   }
   return hookDiagnosticChannel;
 }
@@ -474,8 +474,8 @@ function resetUsageStatusBar(): void {
     return;
   }
 
-  usageStatusBarItem.text = "Muse";
-  usageStatusBarItem.tooltip = "Muse usage summary";
+  usageStatusBarItem.text = "InferHub";
+  usageStatusBarItem.tooltip = "InferHub usage summary";
   usageStatusBarItem.show();
 }
 
@@ -512,7 +512,7 @@ function updateUsageStatusBar(
   usageStatusBarItem.show();
 }
 
-class MuseProvider implements vscode.LanguageModelChatProvider<MuseModel> {
+class InferhubProvider implements vscode.LanguageModelChatProvider<InferhubModel> {
   private readonly changeEmitter = new vscode.EventEmitter<void>();
   readonly onDidChangeLanguageModelChatInformation = this.changeEmitter.event;
   private readonly apiKeysByModelId = new Map<string, string>();
@@ -530,7 +530,7 @@ class MuseProvider implements vscode.LanguageModelChatProvider<MuseModel> {
 
   private getOutputChannel(): vscode.OutputChannel {
     if (!this.outputChannel) {
-      this.outputChannel = vscode.window.createOutputChannel("Muse");
+      this.outputChannel = vscode.window.createOutputChannel("InferHub");
       this.context.subscriptions.push(this.outputChannel);
     }
     return this.outputChannel;
@@ -547,7 +547,7 @@ class MuseProvider implements vscode.LanguageModelChatProvider<MuseModel> {
   }
 
   private async getMetadataSnapshot(): Promise<CachedModelMetadataSnapshot> {
-    return getMuseModelMetadata(
+    return getInferhubModelMetadata(
       this.context,
       getSettings().debugLogging ? this.getOutputChannel() : undefined,
     );
@@ -683,7 +683,7 @@ class MuseProvider implements vscode.LanguageModelChatProvider<MuseModel> {
 
   private async refreshMetadataAndModels(): Promise<void> {
     const apiKey = await this.context.secrets.get(SECRET_KEY);
-    await clearMuseModelMetadataCache(this.context);
+    await clearInferhubModelMetadataCache(this.context);
     await this.fetchModels(apiKey, { showNotification: true });
   }
 
@@ -720,7 +720,7 @@ class MuseProvider implements vscode.LanguageModelChatProvider<MuseModel> {
     if (choice.action === "clear") {
       await this.context.secrets.delete(SECRET_KEY);
       this.changeEmitter.fire();
-      vscode.window.showInformationMessage("Muse API key cleared.");
+      vscode.window.showInformationMessage("InferHub API key cleared.");
       return;
     }
 
@@ -866,7 +866,7 @@ class MuseProvider implements vscode.LanguageModelChatProvider<MuseModel> {
   async provideLanguageModelChatInformation(
     options: vscode.PrepareLanguageModelChatModelOptions,
     token: vscode.CancellationToken
-  ): Promise<MuseModel[]> {
+  ): Promise<InferhubModel[]> {
     const apiKey =
       getConfiguredApiKey(options as ConfiguredLanguageModelInfoOptions)
       ?? await this.context.secrets.get(SECRET_KEY);
@@ -895,7 +895,7 @@ class MuseProvider implements vscode.LanguageModelChatProvider<MuseModel> {
       const baseTooltip = `${this.definition.displayName} model: ${modelId}`;
 
       const isContributor = modelId.includes("contributor");
-      const info: MuseModel = {
+      const info: InferhubModel = {
         id: effectiveModelId,
         rawModelId: modelId,
         name: `${this.definition.modelNamePrefix} / ${formatModelName(displayModelId(modelId))}`,
@@ -914,7 +914,7 @@ class MuseProvider implements vscode.LanguageModelChatProvider<MuseModel> {
         capabilities: modelCapabilities(metadata),
         endpointKind: routing.endpointKind,
         provider: this.definition,
-        configurationSchema: museReasoningConfigurationSchema(),
+        configurationSchema: inferhubReasoningConfigurationSchema(),
       };
 
       this.debugLog(`Model registered: id=${info.id} family=${info.family} metadataSource=${metadata.source} endpointKind=${routing.endpointKind} endpointUrl=${routing.endpointUrl}`);
@@ -924,7 +924,7 @@ class MuseProvider implements vscode.LanguageModelChatProvider<MuseModel> {
   }
 
   async provideLanguageModelChatResponse(
-    model: MuseModel,
+    model: InferhubModel,
     messages: readonly vscode.LanguageModelChatRequestMessage[],
     options: vscode.ProvideLanguageModelChatResponseOptions,
     progress: vscode.Progress<vscode.LanguageModelResponsePart2>,
@@ -954,7 +954,7 @@ class MuseProvider implements vscode.LanguageModelChatProvider<MuseModel> {
     const limits = modelLimits(metadata, settings);
     const hasImageInput = inputHasImages(responsesInput);
     const thinkingPayload = thinkingEffortToPayload(settings.thinkingEffort);
-    const requestHeaders = buildMuseRequestHeaders(
+    const requestHeaders = buildInferhubRequestHeaders(
       messages,
       options,
       rawModelId,
@@ -973,7 +973,7 @@ class MuseProvider implements vscode.LanguageModelChatProvider<MuseModel> {
       updateUsageStatusBar(this.definition.displayName, rawModelId, summary);
     };
 
-    this.debugLog(`Request: initiator=${options.requestInitiator} model=${model.id} rawModel=${rawModelId} endpoint=${routing.endpointKind} metadataSource=${metadata.source} inputItems=${responsesInput.length} session=${requestHeaders["x-muse-session"]} request=${requestHeaders["x-muse-request"]} thinkingEffort=${settings.thinkingEffort} hasImageInput=${hasImageInput}`);
+    this.debugLog(`Request: initiator=${options.requestInitiator} model=${model.id} rawModel=${rawModelId} endpoint=${routing.endpointKind} metadataSource=${metadata.source} inputItems=${responsesInput.length} session=${requestHeaders["x-inferhub-session"]} request=${requestHeaders["x-inferhub-request"]} thinkingEffort=${settings.thinkingEffort} hasImageInput=${hasImageInput}`);
     if (settings.debugReasoning) {
       this.log("Debug logging enabled. Responses API reasoning summaries will stream as thinking parts when available.");
     }
@@ -987,7 +987,7 @@ class MuseProvider implements vscode.LanguageModelChatProvider<MuseModel> {
         apiKey,
         modelId: rawModelId,
         body: buildResponsesRequestBody(rawModelId, responsesInput, options, settings, limits, thinkingPayload),
-        authHeaders: buildMuseAuthHeaders(apiKey),
+        authHeaders: buildInferhubAuthHeaders(apiKey),
         requestHeaders,
         progress,
         token,
@@ -1009,7 +1009,7 @@ class MuseProvider implements vscode.LanguageModelChatProvider<MuseModel> {
       const message = error instanceof Error ? error.message : String(error);
       this.log(`ERROR model=${model.id}: ${message}`);
       this.getOutputChannel().show(true);
-      if (error instanceof MuseRequestError) {
+      if (error instanceof InferHubRequestError) {
         vscode.window.showErrorMessage(error.userMessage);
       }
       throw error;
@@ -1017,7 +1017,7 @@ class MuseProvider implements vscode.LanguageModelChatProvider<MuseModel> {
   }
 
   async provideTokenCount(
-    _model: MuseModel,
+    _model: InferhubModel,
     text: string | vscode.LanguageModelChatRequestMessage,
     _token: vscode.CancellationToken
   ): Promise<number> {
@@ -1033,7 +1033,7 @@ class MuseProvider implements vscode.LanguageModelChatProvider<MuseModel> {
     const showNotification = options?.showNotification ?? false;
     try {
       const headers: Record<string, string> = {
-        "User-Agent": MUSE_USER_AGENT,
+        "User-Agent": INFERHUB_USER_AGENT,
       };
       if (apiKey) {
         headers["Authorization"] = `Bearer ${apiKey}`;
@@ -1098,7 +1098,7 @@ function getConfiguredApiKey(options?: { configuration?: LanguageModelConfigurat
   return typeof configuredApiKey === "string" && configuredApiKey.trim() ? configuredApiKey.trim() : undefined;
 }
 
-async function clearMuseModelMetadataCache(
+async function clearInferhubModelMetadataCache(
   context: vscode.ExtensionContext,
 ): Promise<void> {
   modelMetadataSnapshot = undefined;
@@ -1106,7 +1106,7 @@ async function clearMuseModelMetadataCache(
   await context.globalState.update(MODEL_METADATA_CACHE_KEY, undefined);
 }
 
-async function getMuseModelMetadata(
+async function getInferhubModelMetadata(
   context: vscode.ExtensionContext,
   output?: vscode.OutputChannel,
 ): Promise<CachedModelMetadataSnapshot> {
@@ -1120,14 +1120,14 @@ async function getMuseModelMetadata(
     if (isFreshModelMetadata(cached)) {
       return cached;
     }
-    void refreshMuseModelMetadata(context, output);
+    void refreshInferhubModelMetadata(context, output);
     return cached;
   }
 
-  return refreshMuseModelMetadata(context, output);
+  return refreshInferhubModelMetadata(context, output);
 }
 
-async function refreshMuseModelMetadata(
+async function refreshInferhubModelMetadata(
   context: vscode.ExtensionContext,
   output?: vscode.OutputChannel,
 ): Promise<CachedModelMetadataSnapshot> {
@@ -1149,7 +1149,7 @@ async function refreshMuseModelMetadata(
     modelMetadataSnapshot = snapshot;
     await context.globalState.update(MODEL_METADATA_CACHE_KEY, snapshot);
     output?.appendLine(
-      `[metadata] refreshed models.dev cache muse=${Object.keys(snapshot.providers[MUSE_VENDOR]).length}`,
+      `[metadata] refreshed models.dev cache inferhub=${Object.keys(snapshot.providers[INFERHUB_VENDOR]).length}`,
     );
     return snapshot;
   })()
@@ -1316,7 +1316,7 @@ function toolChoice(_mode: vscode.LanguageModelChatToolMode): "auto" {
 }
 
 // Session/request identifiers forwarded to the Meta gateway as headers.
-function buildMuseRequestHeaders(
+function buildInferhubRequestHeaders(
   messages: readonly vscode.LanguageModelChatRequestMessage[],
   options: vscode.ProvideLanguageModelChatResponseOptions,
   modelId: string,
@@ -1346,10 +1346,10 @@ function buildMuseRequestHeaders(
   );
 
   return {
-    "x-muse-session": sessionId,
-    "x-muse-request": requestId,
-    "x-muse-client": MUSE_CLIENT,
-    "User-Agent": MUSE_USER_AGENT,
+    "x-inferhub-session": sessionId,
+    "x-inferhub-request": requestId,
+    "x-inferhub-client": INFERHUB_CLIENT,
+    "User-Agent": INFERHUB_USER_AGENT,
   };
 }
 
@@ -1711,7 +1711,7 @@ function hasResponsesPayload(item: ResponsesInputItem): boolean {
   return false;
 }
 
-function museReasoningConfigurationSchema(): vscode.LanguageModelConfigurationSchema {
+function inferhubReasoningConfigurationSchema(): vscode.LanguageModelConfigurationSchema {
   return {
     type: "object",
     properties: {
@@ -1743,7 +1743,7 @@ function getRequestModelConfiguration(options: vscode.ProvideLanguageModelChatRe
   return opts.modelConfiguration ?? opts.configuration;
 }
 
-function normalizeThinkingEffort(raw: string | undefined): MuseReasoningEffort {
+function normalizeThinkingEffort(raw: string | undefined): InferhubReasoningEffort {
   const normalized = raw?.toLowerCase().replace(/\s+/g, "");
   if (normalized === "auto" || normalized === "" || normalized === undefined) return "auto";
   if (normalized === "minimal") return "minimal";
@@ -1754,7 +1754,7 @@ function normalizeThinkingEffort(raw: string | undefined): MuseReasoningEffort {
   return "auto";
 }
 
-function resolveThinkingEffort(settings: ApiSettings, override: Record<string, unknown> | undefined): MuseReasoningEffort {
+function resolveThinkingEffort(settings: ApiSettings, override: Record<string, unknown> | undefined): InferhubReasoningEffort {
   const effort = override?.reasoningEffort;
   if (typeof effort === "string") {
     return normalizeThinkingEffort(effort);
@@ -1763,7 +1763,7 @@ function resolveThinkingEffort(settings: ApiSettings, override: Record<string, u
 }
 
 function getSettings(): ApiSettings {
-  const config = vscode.workspace.getConfiguration("meta-muse");
+  const config = vscode.workspace.getConfiguration("inferhub");
 
   return {
     temperature: config.get("temperature", 0.2),
@@ -1785,7 +1785,7 @@ function getSettings(): ApiSettings {
   };
 }
 
-function thinkingEffortToPayload(effort: MuseReasoningEffort): Record<string, unknown> {
+function thinkingEffortToPayload(effort: InferhubReasoningEffort): Record<string, unknown> {
   if (effort === "auto") {
     return { reasoning: { effort: "medium", summary: "auto" } };
   }
@@ -1817,7 +1817,7 @@ function modelLimits(
 }
 
 function applyContextWindowLimit(modelContext: number): number {
-  const limit = vscode.workspace.getConfiguration("meta-muse").get<string>("contextWindowLimit", "full");
+  const limit = vscode.workspace.getConfiguration("inferhub").get<string>("contextWindowLimit", "full");
   const limits: Record<string, number> = {
     "32k": 32768,
     "64k": 65536,
@@ -1871,7 +1871,7 @@ function shouldHideDeprecatedModel(
 
 function resolveRawModelId(modelId: string): string {
   const [base] = modelId.split("::");
-  const prefix = `${MUSE_VENDOR}:`;
+  const prefix = `${INFERHUB_VENDOR}:`;
   if (base.startsWith(prefix)) {
     return base.slice(prefix.length);
   }
