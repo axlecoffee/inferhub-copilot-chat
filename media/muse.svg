@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <rect width="128" height="128" rx="24" fill="#1e1e2e"/>
+  <path d="M 22 88
+           C 22 52, 34 40, 46 40
+           C 56 40, 61 48, 64 54
+           C 67 48, 72 40, 82 40
+           C 94 40, 106 52, 106 88
+           L 92 88
+           C 92 62, 86 54, 80 54
+           C 74 54, 70 62, 68 74
+           L 60 74
+           C 58 62, 54 54, 48 54
+           C 42 54, 36 62, 36 88
+           Z"
+        fill="#89b4fa"/>
+  <text x="64" y="110" text-anchor="middle" font-family="system-ui, sans-serif" font-size="13" font-weight="600" fill="#cdd6f4">meta ghcp slop</text>
+</svg>

@@ -1,0 +1,11 @@
+This file is a copy of the VS Code proposed API declaration for
+`chatProvider`, taken from the vscode repository (microsoft/vscode,
+src/vscode-dts/vscode.proposed.chatProvider.d.ts).
+
+Copyright (c) Microsoft Corporation. All rights reserved.
+
+Licensed under the MIT License. See the LICENSE.txt in the microsoft/vscode
+repository: https://github.com/microsoft/vscode/blob/main/LICENSE.txt
+
+This LicenseRef identifier exists because the upstream text is distributed as
+part of the VS Code proposed API typings rather than a standalone SPDX entry.

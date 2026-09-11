@@ -1,0 +1,82 @@
+# Changelog
+
+All notable changes to the **Meta Muse Copilot Chat** extension are documented here.
+
+Forked from [opencode-copilot-chat](https://github.com/ltmoerdani/opencode-copilot-chat).
+
+## [0.2.0] — 2026-08-10
+
+### Changed
+
+- **Migrated from Chat Completions to Responses API** — all requests now use `POST /v1/responses` with `input` array, `max_output_tokens`, `store:false`, `include:["reasoning.encrypted_content"]`, `prompt_cache_key` + `prompt_cache_retention:"24h"`, and `reasoning:{effort, summary:"auto"}`. This is the recommended endpoint for agents and multi-step tool loops per Meta docs.
+- **Reasoning streaming** — `response.reasoning_summary_text.delta` now streams as `LanguageModelThinkingPart` (collapsible thinking in GHCP Chat). Raw CoT remains private; summary is optional per Meta docs.
+- **Tool calling via Responses** — `function_call` / `function_call_arguments.delta` / `function_call_arguments.done` SSE events now drive `LanguageModelToolCallPart` emission.
+- **Prompt caching** — automatic prefix caching with stable `prompt_cache_key` and `24h` retention hint. `cached_tokens` from `input_tokens_details` reported in status bar and diagnostics.
+
+### Fixed
+
+- Chat Completions `reasoning_content` is redacted to empty for external keys — Responses API is the only way to get reasoning continuity and summaries.
+
+## [0.1.5] — 2026-07-08
+
+### Fixed
+
+- **VS Code 1.128 BYOK utility model compatibility** — VS Code 1.128 introduced `chat.byokUtilityModelDefault` with a default of `"none"`, which broke all background utility tasks (chat title generation, commit messages, intent detection) for BYOK users. The extension now automatically sets `chat.byokUtilityModelDefault = "mainAgent"` on first activation (VS Code 1.128+), routing background tasks to the currently-selected Muse model. A one-time toast notification confirms the fix. Users who have already configured any utility model setting are left untouched.
+
+## [0.1.4] — 2026-07-04
+
+### Changed
+
+- **Marketplace SEO overhaul** — `displayName` now leads with value proposition ("BYOK Xiaomi AI Models (1M Context)"). Description rewritten pain-first with brand names. Keywords expanded from 21 to 38 entries (added `language-models`, `bring-your-own-key`, `reasoning`, `thinking`, `agent`, `long-context`, `1m-context`, and competitor brand keywords for search hijack).
+- **Added `@tag:language-models`** — extension now appears when users search `@tag:language-models` per the VS Code BYOK blog post.
+- **Categories expanded** — added `Machine Learning`, `Data Science`, `Education` for broader discovery.
+- **README rewritten as sales page** — added pitch block, comparison table (Copilot Free/Pro/Pro+ vs MiMo), 60-sec quick start, 7-item FAQ, review CTA, and sibling extension cross-promotion.
+
+## [0.1.3] — 2026-06-14
+
+### Fixed
+
+- **Model list fetch errors no longer spam notifications** — when the MiMo API key is invalid/expired (401) or the model list endpoint is unreachable, the error is now silently logged to the **MiMo Output Channel** during background fetches instead of showing a popup every time the chat panel loads.
+- The popup notification is now reserved for **manual refresh only** (via the *Refresh Models* command), so users are still alerted when they explicitly request a refresh.
+- Runtime chat request errors (sent during an actual conversation) are unchanged — they continue to surface immediately as before.
+- **Robust stream abort mechanism** — `abort()` now also calls `reader.cancel()` directly as a fallback. In Electron/Node.js fetch, `controller.abort()` on an already-received response body sometimes does not propagate to the stream reader, leaving `reader.read()` stuck forever. The explicit cancel guarantees the stuck read is unblocked.
+- **First-event timeout (90s)** — a dedicated timer fires when the server returns `200 OK` with `text/event-stream` but never sends any SSE data. This catches the "server accepted the request but silently stalled" case faster than waiting for the stream idle timeout (which may never fire if `reader.read()` is stuck).
+- **Default request timeout reduced from 300s to 120s** — users now wait a maximum of 2 minutes before a failing request surfaces an error, down from 5 minutes.
+- **Removed speculative error messages** — timeout errors no longer claim "this often happens with large conversation context — try continuing in a new chat". They report facts only (duration and phase), avoiding misleading users about the root cause.
+- **Smart retry with body pruning on empty-stream timeout** — when the server accepts a request but sends no data (detected via first-event or stream-idle timeout), the extension automatically retries once with a pruned payload body. Older messages are trimmed (keeping ~50% most recent plus any system prompt), which often resolves silent server drops without requiring the user to manually start a new chat. Compatible with OpenAI Chat, Anthropic Messages, Google GenerateContent, and Responses API body formats.
+
+### Changed
+
+- `DEFAULT_REQUEST_TIMEOUT_MS`: `300000` → `120000` (2 minutes).
+
+## [0.1.2] — 2026-05-30
+
+### Fixed
+
+- **Phased timeout architecture** — replaced the single 10-minute wall timeout with a two-phase approach:
+  - **60s connection timeout** — fails fast if the MiMo server is unreachable (previously could hang for 10 minutes).
+  - **5 min overall timeout** — reduced from 10 minutes (MiMo is consistently <2s TTFB).
+  - **90s stream idle timeout** — reduced from 2 minutes to detect stalled streams sooner.
+- **Auto-retry on transient connection errors** — requests automatically retry once (with 1s backoff) on `ECONNRESET`, `ECONNREFUSED`, socket hang up, and other recoverable network errors.
+- **Improved timeout error messages** — now indicates whether the failure occurred during the "connection" or "streaming" phase, with actionable suggestions.
+- Corrected MiMo model IDs to Xiaomi's lowercase API identifiers and filtered the live model list to chat-capable MiMo models.
+- Reused the SecretStorage API key when VS Code does not pass provider configuration into model discovery or chat requests.
+- Quieted routine request/model metadata output by default behind the `xiaomi-mimo.debugLogging` setting.
+
+### Changed
+
+- Default `requestTimeoutSeconds`: `600` → `300` (minimum raised to 30s).
+- Default `streamIdleTimeoutSeconds`: `120` → `90` (minimum raised to 10s).
+
+## [0.1.0] — 2026-05-27
+
+### Added
+
+- Forked from [opencode-copilot-chat](https://github.com/ltmoerdani/opencode-copilot-chat) and adapted for Xiaomi MiMo AI models.
+- MiMo provider registration with Xiaomi API endpoint (`https://token-plan-sgp.xiaomimimo.com/v1`).
+- Simplified transport layer — all models route through OpenAI-compatible `/chat/completions`.
+- Updated bundled model catalog to MiMo models only: `mimo-v2.5` and `mimo-v2.5-pro`.
+- Updated all VS Code settings to `xiaomi-mimo.*` prefix.
+- Updated all commands to `MiMo:*`.
+- Removed unused features from upstream: dual-provider architecture, Anthropic/Google transports, TTL-cached models.dev snapshot, experimental context indicator, `freeOnly` toggle, debug reasoning output.
+- Cleaned up codebase: removed unused test files, simplified auth headers, simplified routing logic.

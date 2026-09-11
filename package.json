@@ -1,0 +1,209 @@
+{
+  "name": "meta-muse-copilot-chat",
+  "displayName": "Muse Copilot Chat: BYOK Meta AI Models (1M Context)",
+  "description": "Use Meta Muse AI models (muse-spark-1.2-contributor, 1M context window) in GitHub Copilot Chat via InferHub. BYOK, no Copilot Pro needed.",
+  "version": "0.3.0",
+  "publisher": "axlecoffee",
+  "preview": true,
+  "license": "AGPL-3.0-or-later",
+  "icon": "media/muse.svg",
+  "galleryBanner": {
+    "color": "#1e1e2e",
+    "theme": "dark"
+  },
+  "keywords": [
+    "muse",
+    "meta",
+    "meta-muse",
+    "muse-spark",
+    "muse-spark-1.2",
+    "muse-spark-1.2-contributor",
+    "copilot",
+    "copilot-chat",
+    "byok",
+    "bring-your-own-key",
+    "ai",
+    "language-model",
+    "language-models",
+    "llm",
+    "chat",
+    "reasoning",
+    "thinking",
+    "agent",
+    "long-context",
+    "1m-context",
+    "api-key",
+    "code-assistant",
+    "coding",
+    "developer-tools"
+  ],
+  "categories": [
+    "AI",
+    "Machine Learning",
+    "Data Science",
+    "Education",
+    "Other"
+  ],
+  "tags": [
+    "language-models"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/axlecoffee/meta-muse-copilot-chat.git"
+  },
+  "bugs": {
+    "url": "https://github.com/axlecoffee/meta-muse-copilot-chat/issues"
+  },
+  "homepage": "https://github.com/axlecoffee/meta-muse-copilot-chat#readme",
+  "engines": {
+    "vscode": "^1.125.0"
+  },
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "meta-muse.manage",
+        "title": "Muse: Manage Provider"
+      },
+      {
+        "command": "meta-muse.setApiKey",
+        "title": "Muse: Set API Key"
+      },
+      {
+        "command": "meta-muse.usage",
+        "title": "Muse: Show InferHub Usage"
+      },
+      {
+        "command": "meta-muse.diagnostics",
+        "title": "Muse: Diagnostics"
+      },
+      {
+        "command": "meta-muse.modelPickerDiagnostics",
+        "title": "Muse: Model Picker Diagnostics"
+      }
+    ],
+    "configuration": {
+      "title": "Muse",
+      "properties": {
+        "meta-muse.baseUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Override the InferHub API base URL. Leave empty to use the default https://api.inferhub.dev/v1 endpoint."
+        },
+        "meta-muse.temperature": {
+          "type": "number",
+          "default": 0.2,
+          "minimum": 0,
+          "maximum": 2,
+          "description": "Sampling temperature used for chat completions."
+        },
+        "meta-muse.maxTokens": {
+          "type": "number",
+          "default": 0,
+          "minimum": 0,
+          "description": "Optional max output token override. Use 0 to request each Muse model's configured maximum."
+        },
+        "meta-muse.maxInputTokens": {
+          "type": "number",
+          "default": 0,
+          "minimum": 0,
+          "description": "Optional context size override advertised to VS Code. Use 0 to advertise each Muse model's configured context window."
+        },
+        "meta-muse.contextWindowLimit": {
+          "type": "string",
+          "default": "full",
+          "enum": ["full", "1m", "512k", "256k", "128k", "64k", "32k"],
+          "enumDescriptions": [
+            "Model default (1M for Muse Spark)",
+            "1,024,000 tokens",
+            "512,000 tokens",
+            "256,000 tokens",
+            "128,000 tokens",
+            "64,000 tokens",
+            "32,000 tokens"
+          ],
+          "description": "Limit the advertised context window size. Smaller windows can improve response quality and reduce costs for shorter conversations. The API request still uses the full model context, but VS Code will not send more than this limit."
+        },
+        "meta-muse.thinking.effort": {
+          "type": "string",
+          "default": "Auto",
+          "enum": ["Auto", "Minimal", "Low", "Medium", "High", "XHigh"],
+          "enumDescriptions": [
+            "Let the model decide (reasoning_effort omitted)",
+            "Minimal reasoning",
+            "Light reasoning",
+            "Moderate depth",
+            "Deep reasoning",
+            "Maximum reasoning depth"
+          ],
+          "description": "Global default reasoning effort for Muse models. Muse Spark always reasons, so there is no Off option. Can be overridden per-model from the Copilot Chat model picker."
+        },
+        "meta-muse.debugReasoning": {
+          "type": "boolean",
+          "default": false,
+          "description": "Write verbose request and response diagnostics to the Muse output channel. Note: Muse Spark reasoning is private and is not returned by the API."
+        },
+        "meta-muse.debugLogging": {
+          "type": "boolean",
+          "default": false,
+          "description": "Write verbose request, response, and model registration diagnostics to the Muse output channel."
+        },
+        "meta-muse.requestTimeoutSeconds": {
+          "type": "number",
+          "default": 300,
+          "minimum": 30,
+          "description": "Total request timeout in seconds for Muse chat requests. The connection phase has a separate 60s timeout."
+        },
+        "meta-muse.streamIdleTimeoutSeconds": {
+          "type": "number",
+          "default": 90,
+          "minimum": 10,
+          "description": "Streaming idle timeout in seconds. If Muse stops sending response chunks for this long, the request is cancelled."
+        },
+        "meta-muse.showUsageStatusBar": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the latest Muse prompt/output/cache usage summary in the VS Code status bar after each response."
+        },
+        "meta-muse.experimentalContextIndicator": {
+          "type": "boolean",
+          "default": false,
+          "description": "Experimental: attempt to inject real token usage into the Copilot Chat context indicator using VS Code internals. May break on VS Code updates."
+        }
+      }
+    },
+    "languageModelChatProviders": [
+      {
+        "vendor": "meta-muse",
+        "displayName": "Muse (InferHub)",
+        "configuration": {
+          "type": "object",
+          "required": [
+            "apiKey"
+          ],
+          "properties": {
+            "apiKey": {
+              "type": "string",
+              "title": "InferHub API Key",
+              "description": "Enter your InferHub API key (sk-airo-...).",
+              "secret": true
+            }
+          }
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "test": "npm run compile && node --test",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package",
+    "vscode:prepublish": "npm run compile"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.0",
+    "@types/vscode": "^1.125.0",
+    "@vscode/vsce": "^3.6.0",
+    "typescript": "^5.9.3"
+  }
+}

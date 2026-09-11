@@ -1,0 +1,19 @@
+version = 1
+
+[[annotations]]
+path = ["**.yml", "**.yaml", "**.json", ".env", ".gitignore", ".vscodeignore", ".vscode/**", "docs/**", "media/**"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 axlecoffee"
+SPDX-License-Identifier = "AGPL-3.0-or-later"
+
+[[annotations]]
+path = ["CHANGELOG.md", "README.md", ".github/PULL_REQUEST_TEMPLATE.md"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 axlecoffee"
+SPDX-License-Identifier = "AGPL-3.0-or-later"
+
+[[annotations]]
+path = ["src/vscode.proposed.chatProvider.d.ts"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Microsoft Corporation and axlecoffee"
+SPDX-License-Identifier = "LicenseRef-VSCode-proposed-api"
