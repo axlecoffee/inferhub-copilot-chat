@@ -6,7 +6,7 @@
   "publisher": "axlecoffee",
   "preview": true,
   "license": "AGPL-3.0-or-later",
-  "icon": "media/inferhub.svg",
+  "icon": "media/inferhub.png",
   "galleryBanner": {
     "color": "#1e1e2e",
     "theme": "dark"
