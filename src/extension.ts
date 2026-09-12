@@ -55,7 +55,6 @@ let usageStatusBarItem: vscode.StatusBarItem | undefined;
 interface ProviderDefinition {
   vendor: typeof INFERHUB_VENDOR;
   displayName: string;
-  modelNamePrefix: string;
   modelsUrl: string;
   chatCompletionsUrl: string;
   messagesUrl: string;
@@ -63,7 +62,6 @@ interface ProviderDefinition {
   categoryOrder: number;
   testModelId: string;
   fallbackModels: string[];
-  filterModel?: (modelId: string) => boolean;
 }
 
 type ModelEndpointKind =
@@ -85,8 +83,42 @@ function getInferhubBaseUrl(): string {
   return override.trim() || INFERHUB_BASE_URL_DEFAULT;
 }
 
-function isSupportedInferhubModel(modelId: string): boolean {
-  return /muse-spark/i.test(modelId);
+// Upstream prefix -> display label, mirrors the InferHub dashboard model list.
+const PROVIDER_LABEL_BY_PREFIX: Record<string, string> = {
+  ag: "Antigravity",
+  ali: "Qwencloud/Alibaba",
+  cb: "CodeBuddy",
+  cbcn: "CodeBuddy CN",
+  cc: "Claude Code",
+  cmc: "Command Code",
+  cp: "ClinePass",
+  cx: "OpenAI Codex",
+  mimo: "Xiaomi MiMo",
+  ocg: "OpenCode Go",
+  zai: "Z.AI",
+};
+
+interface CatalogModel {
+  id: string;
+  label?: string;
+  isAlias: boolean;
+}
+
+function providerLabelForModelId(modelId: string): string | undefined {
+  const slashIndex = modelId.indexOf("/");
+  if (slashIndex <= 0) {
+    return undefined;
+  }
+  return PROVIDER_LABEL_BY_PREFIX[modelId.slice(0, slashIndex)];
+}
+
+function catalogModelDisplayName(entry: CatalogModel): string {
+  const modelPart = entry.label || formatModelName(displayModelId(entry.id));
+  if (entry.isAlias) {
+    return `${modelPart} (alias)`;
+  }
+  const provider = providerLabelForModelId(entry.id);
+  return provider ? `${modelPart} (${provider})` : modelPart;
 }
 
 function buildProviderDefinition(): ProviderDefinition {
@@ -94,7 +126,6 @@ function buildProviderDefinition(): ProviderDefinition {
   return {
     vendor: INFERHUB_VENDOR,
     displayName: "InferHub",
-    modelNamePrefix: "InferHub",
     modelsUrl: `${baseUrl}/models`,
     chatCompletionsUrl: `${baseUrl}/chat/completions`,
     messagesUrl: `${baseUrl}/chat/completions`,
@@ -107,7 +138,6 @@ function buildProviderDefinition(): ProviderDefinition {
       "cmc/meta/muse-spark-1.3-contributor",
       "cmc/meta/muse-spark-1.3",
     ],
-    filterModel: isSupportedInferhubModel,
   };
 }
 
@@ -147,6 +177,9 @@ interface ModelListEntry {
   image_input?: boolean;
   imageInput?: boolean;
   reasoning?: boolean;
+  upstream_label?: string;
+  modality?: string;
+  reasoning_levels?: string[];
   modalities?: {
     input?: string[];
     output?: string[];
@@ -883,7 +916,8 @@ class InferhubProvider implements vscode.LanguageModelChatProvider<InferhubModel
     const settings = getSettings();
     const metadataSnapshot = await this.getMetadataSnapshot();
 
-    return models.map((modelId) => {
+    return models.map((entry) => {
+      const modelId = entry.id;
       const metadata = this.resolveModelMetadata(modelId, metadataSnapshot);
       const routing = resolveModelRouting(modelId, this.definition);
       const effectiveModelId = toEffectiveModelId(modelId, this.definition.vendor);
@@ -891,17 +925,16 @@ class InferhubProvider implements vscode.LanguageModelChatProvider<InferhubModel
       this.apiKeysByModelId.set(modelId, apiKey);
       this.apiKeysByModelId.set(effectiveModelId, apiKey);
 
-      const baseDetail = this.definition.displayName;
       const baseTooltip = `${this.definition.displayName} model: ${modelId}`;
 
       const isContributor = modelId.includes("contributor");
       const info: InferhubModel = {
         id: effectiveModelId,
         rawModelId: modelId,
-        name: `${this.definition.modelNamePrefix} / ${formatModelName(displayModelId(modelId))}`,
+        name: catalogModelDisplayName(entry),
         family: `${this.definition.vendor}-${modelId}-${MODEL_METADATA_REVISION}`,
         version: `1.3.0-${MODEL_METADATA_REVISION}-${limits.contextWindow}-${limits.maxOutputTokens}`,
-        detail: baseDetail,
+        detail: entry.isAlias ? `${modelId} (auto-routed)` : modelId,
         tooltip: baseTooltip,
         category: {
           label: this.definition.displayName,
@@ -953,7 +986,11 @@ class InferhubProvider implements vscode.LanguageModelChatProvider<InferhubModel
     const routing = resolveModelRouting(rawModelId, this.definition);
     const limits = modelLimits(metadata, settings);
     const hasImageInput = inputHasImages(responsesInput);
-    const thinkingPayload = thinkingEffortToPayload(settings.thinkingEffort);
+    // Only reasoning-capable models get an effort payload; strict upstreams
+    // reject the field otherwise.
+    const thinkingPayload = metadata.reasoning
+      ? thinkingEffortToPayload(settings.thinkingEffort)
+      : {};
     const requestHeaders = buildInferhubRequestHeaders(
       messages,
       options,
@@ -1029,7 +1066,7 @@ class InferhubProvider implements vscode.LanguageModelChatProvider<InferhubModel
   private async fetchModels(
     apiKey?: string,
     options?: { showNotification?: boolean },
-  ): Promise<string[]> {
+  ): Promise<CatalogModel[]> {
     const showNotification = options?.showNotification ?? false;
     try {
       const headers: Record<string, string> = {
@@ -1046,17 +1083,31 @@ class InferhubProvider implements vscode.LanguageModelChatProvider<InferhubModel
 
       const data = await response.json() as ModelListResponse;
       this.replaceLiveModelMetadata(data.data);
-      const ids = data.data
-        ?.map((model) => model.id)
-        .filter((id): id is string => typeof id === "string" && id.length > 0)
-        .filter((id) => this.definition.filterModel?.(id) ?? true);
+      const entries: CatalogModel[] = [];
+      for (const model of data.data ?? []) {
+        if (typeof model.id !== "string" || !model.id) {
+          continue;
+        }
+        entries.push({
+          id: model.id,
+          label: model.upstream_label,
+          isAlias: model.owned_by === "alias",
+        });
+      }
 
       // Always include the bundled fallback models so documented models that the
       // /models endpoint does not list (e.g. muse-spark-1.2-contributor) are
       // still selectable in the picker.
-      const mergedIds = [...new Set([...(ids ?? []), ...this.definition.fallbackModels])];
+      const entriesById = new Map(entries.map((entry) => [entry.id, entry]));
+      for (const fallbackId of this.definition.fallbackModels) {
+        if (!entriesById.has(fallbackId)) {
+          entriesById.set(fallbackId, { id: fallbackId, isAlias: false });
+        }
+      }
 
-      return this.filterAvailableModels(mergedIds.length ? mergedIds : this.definition.fallbackModels);
+      const allEntries = [...entriesById.values()];
+      const keptIds = new Set(await this.filterAvailableModels(allEntries.map((entry) => entry.id)));
+      return keptIds.size ? allEntries.filter((entry) => keptIds.has(entry.id)) : allEntries;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const warning = `Could not fetch ${this.definition.displayName} model list. Using bundled model list. ${message}`;
@@ -1064,7 +1115,8 @@ class InferhubProvider implements vscode.LanguageModelChatProvider<InferhubModel
       if (showNotification) {
         vscode.window.showWarningMessage(warning);
       }
-      return this.filterAvailableModels(this.definition.fallbackModels);
+      return (await this.filterAvailableModels(this.definition.fallbackModels))
+        .map((id) => ({ id, isAlias: false }));
     }
   }
 

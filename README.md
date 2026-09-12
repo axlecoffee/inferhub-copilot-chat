@@ -16,16 +16,20 @@ Get an API key from [InferHub](https://inferhub.dev).
 
 ## Models
 
-The extension fetches the live catalog from `https://api.inferhub.dev/v1/models` and falls back to the bundled Muse Spark entries when offline:
+The extension registers **every model the InferHub catalog returns**: concrete rails (`ag/`, `cc/`, `cmc/`, `cx/`, `ocg/`, `zai/`, `cb/`, `cbcn/`, `cp/`, `mimo/`, `ali/`) and auto-route aliases. If the catalog is unreachable it falls back to the bundled Muse Spark entries.
 
-| Model | Context window |
-|---|---:|
-| `cmc/meta/muse-spark-1.2` | 1,048,576 |
-| `cmc/meta/muse-spark-1.2-contributor` | 1,048,576 |
-| `cmc/meta/muse-spark-1.3` | 1,048,576 |
-| `cmc/meta/muse-spark-1.3-contributor` | 1,048,576 |
+Picker names are tagged with the serving provider, e.g.:
 
-The contributor tier is cheaper because the upstream trains on your prompts and completions. The standard tier does not.
+| Catalog id | Picker name |
+|---|---|
+| `ag/claude-opus-4-6-thinking` | Claude Opus 4.6 (Antigravity) |
+| `cmc/meta/muse-spark-1.2` | Muse Spark 1.2 (Command Code) |
+| `cx/gpt-5.6-luna` | GPT 5.6 Luna (OpenAI Codex) |
+| `muse-spark-1.2` | Muse Spark 1.2 (alias) |
+
+Aliases (bare names, no prefix) auto-route to the cheapest provider behind the name — `(alias)` in the picker, `(auto-routed)` in the detail line.
+
+Muse Spark keeps its 1,048,576 token context window. The contributor tier is cheaper because the upstream trains on your prompts and completions; the standard tier does not.
 
 ## Endpoint
 

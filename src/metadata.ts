@@ -46,6 +46,9 @@ export interface ModelListEntry {
   image_input?: boolean;
   imageInput?: boolean;
   reasoning?: boolean;
+  upstream_label?: string;
+  modality?: string;
+  reasoning_levels?: string[];
   modalities?: {
     input?: string[];
     output?: string[];
@@ -182,9 +185,14 @@ export function normalizeLiveModelMetadata(
     supportsVision: detectVisionSupport(
       model.modalities,
       model.imageInput ?? model.image_input ?? model.attachment,
+      model.modality,
     ),
     reasoning:
-      typeof model.reasoning === "boolean" ? model.reasoning : undefined,
+      typeof model.reasoning === "boolean"
+        ? model.reasoning
+        : Array.isArray(model.reasoning_levels) && model.reasoning_levels.length > 0
+          ? true
+          : undefined,
     status: model.deprecated
       ? "deprecated"
       : typeof model.status === "string"
@@ -297,7 +305,14 @@ function normalizeModelMetadataFields(
 function detectVisionSupport(
   modalities: { input?: string[]; output?: string[] } | undefined,
   attachmentHint: boolean | undefined,
+  modalityString?: string,
 ): boolean | undefined {
+  // InferHub /v1/models advertises "text" or "text,image"
+  if (typeof modalityString === "string" && modalityString.length > 0) {
+    return modalityString
+      .split(",")
+      .some((part) => part.trim() !== "" && part.trim() !== "text");
+  }
   const inputModalities = Array.isArray(modalities?.input)
     ? modalities.input
     : undefined;

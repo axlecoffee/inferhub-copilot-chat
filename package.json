@@ -2,7 +2,7 @@
   "name": "inferhub-copilot-chat",
   "displayName": "InferHub Copilot Chat",
   "description": "Use InferHub models (Muse Spark 1M context and friends) in GitHub Copilot Chat. BYOK with your InferHub API key, no Copilot Pro needed.",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "publisher": "axlecoffee",
   "preview": true,
   "license": "AGPL-3.0-or-later",
