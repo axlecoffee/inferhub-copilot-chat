@@ -178,7 +178,6 @@ interface ModelListEntry {
   imageInput?: boolean;
   reasoning?: boolean;
   upstream_label?: string;
-  modality?: string;
   reasoning_levels?: string[];
   modalities?: {
     input?: string[];

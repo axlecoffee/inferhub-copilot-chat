@@ -47,7 +47,6 @@ export interface ModelListEntry {
   imageInput?: boolean;
   reasoning?: boolean;
   upstream_label?: string;
-  modality?: string;
   reasoning_levels?: string[];
   modalities?: {
     input?: string[];
@@ -182,11 +181,9 @@ export function normalizeLiveModelMetadata(
     maxOutputTokens: positiveNumber(
       model.maxOutputTokens ?? model.max_output_tokens ?? model.limit?.output,
     ),
-    supportsVision: detectVisionSupport(
-      model.modalities,
-      model.imageInput ?? model.image_input ?? model.attachment,
-      model.modality,
-    ),
+    // InferHub under-reports vision: known-vision models (e.g. muse) are
+    // advertised "text"-only and aliases omit the field entirely. Default on.
+    supportsVision: true,
     reasoning:
       typeof model.reasoning === "boolean"
         ? model.reasoning
@@ -305,14 +302,7 @@ function normalizeModelMetadataFields(
 function detectVisionSupport(
   modalities: { input?: string[]; output?: string[] } | undefined,
   attachmentHint: boolean | undefined,
-  modalityString?: string,
 ): boolean | undefined {
-  // InferHub /v1/models advertises "text" or "text,image"
-  if (typeof modalityString === "string" && modalityString.length > 0) {
-    return modalityString
-      .split(",")
-      .some((part) => part.trim() !== "" && part.trim() !== "text");
-  }
   const inputModalities = Array.isArray(modalities?.input)
     ? modalities.input
     : undefined;
