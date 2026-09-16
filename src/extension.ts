@@ -222,7 +222,7 @@ interface PendingToolCall {
   arguments: string;
 }
 
-type InferhubReasoningEffort = "auto" | "minimal" | "low" | "medium" | "high" | "xhigh";
+type InferhubReasoningEffort = "auto" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 
 interface ApiSettings {
   temperature: number;
@@ -1769,15 +1769,16 @@ function inferhubReasoningConfigurationSchema(): vscode.LanguageModelConfigurati
       reasoningEffort: {
         type: "string",
         title: "Thinking Effort",
-        enum: ["auto", "minimal", "low", "medium", "high", "xhigh"],
-        enumItemLabels: ["Auto", "Minimal", "Low", "Medium", "High", "XHigh"],
+        enum: ["auto", "minimal", "low", "medium", "high", "xhigh", "max"],
+        enumItemLabels: ["Auto", "Minimal", "Low", "Medium", "High", "XHigh", "Max"],
         enumDescriptions: [
           "Let the model decide",
           "Minimal reasoning",
           "Light reasoning",
           "Moderate depth",
           "Deep reasoning",
-          "Maximum reasoning depth"
+          "Very deep reasoning, slower",
+          "Maximum reasoning depth (GLM and friends advertise this)"
         ],
         default: "auto",
         group: "navigation"
@@ -1802,6 +1803,7 @@ function normalizeThinkingEffort(raw: string | undefined): InferhubReasoningEffo
   if (normalized === "medium") return "medium";
   if (normalized === "high") return "high";
   if (normalized === "xhigh") return "xhigh";
+  if (normalized === "max") return "max";
   return "auto";
 }
 

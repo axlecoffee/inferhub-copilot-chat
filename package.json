@@ -2,7 +2,7 @@
   "name": "inferhub-copilot-chat",
   "displayName": "InferHub Copilot Chat",
   "description": "Use InferHub models (Muse Spark 1M context and friends) in GitHub Copilot Chat. BYOK with your InferHub API key, no Copilot Pro needed.",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "publisher": "axlecoffee",
   "preview": true,
   "license": "AGPL-3.0-or-later",
@@ -127,21 +127,22 @@
         "inferhub.thinking.effort": {
           "type": "string",
           "default": "Auto",
-          "enum": ["Auto", "Minimal", "Low", "Medium", "High", "XHigh"],
+          "enum": ["Auto", "Minimal", "Low", "Medium", "High", "XHigh", "Max"],
           "enumDescriptions": [
-            "Let the model decide (reasoning_effort omitted)",
+            "Balanced default (medium)",
             "Minimal reasoning",
             "Light reasoning",
             "Moderate depth",
             "Deep reasoning",
-            "Maximum reasoning depth"
+            "Very deep reasoning, slower",
+            "Maximum reasoning depth (GLM and friends advertise this)"
           ],
-          "description": "Global default reasoning effort for Muse models. Muse Spark always reasons, so there is no Off option. Can be overridden per-model from the Copilot Chat model picker."
+          "description": "Default reasoning effort for models that support thinking. Models that do not advertise reasoning levels are sent no effort field. Can be overridden per-model from the Copilot Chat model picker."
         },
         "inferhub.debugReasoning": {
           "type": "boolean",
           "default": false,
-          "description": "Write verbose request and response diagnostics to the InferHub output channel. Note: Muse Spark reasoning is private and is not returned by the API."
+          "description": "Write verbose request and response diagnostics to the InferHub output channel."
         },
         "inferhub.debugLogging": {
           "type": "boolean",

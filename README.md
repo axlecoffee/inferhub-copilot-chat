@@ -50,7 +50,7 @@ The status bar also shows a per-response prompt/output token summary with cost w
 | `inferhub.maxTokens` | `0` | Max output token override (0 = per-model default) |
 | `inferhub.maxInputTokens` | `0` | Context size override advertised to VS Code |
 | `inferhub.contextWindowLimit` | `full` | Cap the advertised context window (`full`, `1m`, `512k`, ... `32k`) |
-| `inferhub.thinking.effort` | `Auto` | Reasoning effort (`Auto`, `Minimal`, `Low`, `Medium`, `High`, `XHigh`) |
+| `inferhub.thinking.effort` | `Auto` | Reasoning effort (`Auto`, `Minimal`, `Low`, `Medium`, `High`, `XHigh`, `Max`) |
 | `inferhub.requestTimeoutSeconds` | `300` | Total request timeout |
 | `inferhub.streamIdleTimeoutSeconds` | `90` | Cancel if the stream goes silent this long |
 | `inferhub.showUsageStatusBar` | `true` | Token usage summary in the status bar |
