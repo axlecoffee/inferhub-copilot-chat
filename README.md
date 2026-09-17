@@ -51,7 +51,7 @@ The status bar also shows a per-response prompt/output token summary with cost w
 | `inferhub.maxInputTokens` | `0` | Context size override advertised to VS Code |
 | `inferhub.contextWindowLimit` | `full` | Cap the advertised context window (`full`, `1m`, `512k`, ... `32k`) |
 | `inferhub.thinking.effort` | `Auto` | Reasoning effort (`Auto`, `Minimal`, `Low`, `Medium`, `High`, `XHigh`, `Max`) |
-| `inferhub.requestTimeoutSeconds` | `300` | Total request timeout |
+| `inferhub.requestTimeoutSeconds` | `300` | Total request timeout (covers the wait for the first byte too) |
 | `inferhub.streamIdleTimeoutSeconds` | `90` | Cancel if the stream goes silent this long |
 | `inferhub.showUsageStatusBar` | `true` | Token usage summary in the status bar |
 | `inferhub.debugLogging` | `false` | Verbose diagnostics to the output channel |

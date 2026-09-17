@@ -128,7 +128,6 @@ function reportProgressPart(
   reportProgressWithContextWindowRequest(localRequestId, progress, part);
 }
 
-const CONNECTION_TIMEOUT_MS = 60_000;
 const FIRST_EVENT_TIMEOUT_MS = 90_000;
 const MAX_RETRIES = 2;
 
@@ -289,14 +288,6 @@ async function streamInferhubResponseAttempt(
   const cancellation = options.token.onCancellationRequested(() =>
     abort("cancelled"),
   );
-  const connectionTimeout = setTimeout(
-    () => {
-      if (firstByteAt === undefined) {
-        abort("request-timeout");
-      }
-    },
-    Math.min(CONNECTION_TIMEOUT_MS, options.requestTimeoutMs),
-  );
   const requestTimeout = setTimeout(
     () => abort("request-timeout"),
     options.requestTimeoutMs,
@@ -411,7 +402,7 @@ async function streamInferhubResponseAttempt(
     if (options.debugTransport) {
       const attemptLabel = attempt > 0 ? ` attempt=${attempt + 1}` : "";
       options.output?.appendLine(
-        `[request] url=${options.url} payloadBytes=${payload.length} requestTimeoutMs=${options.requestTimeoutMs} streamIdleTimeoutMs=${options.streamIdleTimeoutMs} connectionTimeoutMs=${CONNECTION_TIMEOUT_MS}${attemptLabel}`,
+        `[request] url=${options.url} payloadBytes=${payload.length} requestTimeoutMs=${options.requestTimeoutMs} streamIdleTimeoutMs=${options.streamIdleTimeoutMs}${attemptLabel}`,
       );
     }
     const response = await fetch(options.url, {
@@ -427,7 +418,6 @@ async function streamInferhubResponseAttempt(
 
     responseStatus = response.status;
     responseContentType = response.headers.get("content-type") ?? "";
-    clearTimeout(connectionTimeout);
     firstByteAt ??= Date.now();
     if (options.debugTransport) {
       options.output?.appendLine(
@@ -572,7 +562,7 @@ async function streamInferhubResponseAttempt(
       const requestError = new InferHubRequestError(
         `${options.providerDisplayName} request timed out after ${formatDuration(elapsed)} (during ${phase} phase).`,
         firstByteAt === undefined
-          ? `${options.providerDisplayName} did not respond within ${formatDuration(CONNECTION_TIMEOUT_MS)}. The server may be temporarily unavailable. Try again in a moment or switch to a different model.`
+          ? `${options.providerDisplayName} did not start responding within ${formatDuration(options.requestTimeoutMs)}. The model may be queued or its providers may be at capacity. Check the InferHub dashboard, or try another model.`
           : `${options.providerDisplayName} started responding but timed out after ${formatDuration(options.requestTimeoutMs)}.`,
       );
       emitSummary(0, 0, {
@@ -597,7 +587,6 @@ async function streamInferhubResponseAttempt(
     });
     throw error;
   } finally {
-    clearTimeout(connectionTimeout);
     clearTimeout(requestTimeout);
     if (streamIdleTimeout) {
       clearTimeout(streamIdleTimeout);

@@ -2,7 +2,7 @@
   "name": "inferhub-copilot-chat",
   "displayName": "InferHub Copilot Chat",
   "description": "Use InferHub models (Muse Spark 1M context and friends) in GitHub Copilot Chat. BYOK with your InferHub API key, no Copilot Pro needed.",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "publisher": "axlecoffee",
   "preview": true,
   "license": "AGPL-3.0-or-later",
@@ -153,7 +153,7 @@
           "type": "number",
           "default": 300,
           "minimum": 30,
-          "description": "Total request timeout in seconds for InferHub chat requests. The connection phase has a separate 60s timeout."
+          "description": "Total request timeout in seconds, covering the connection phase as well. Raise this if models queue at the marketplace."
         },
         "inferhub.streamIdleTimeoutSeconds": {
           "type": "number",
